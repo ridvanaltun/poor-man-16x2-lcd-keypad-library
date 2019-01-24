@@ -567,7 +567,6 @@ class Character_LCD_Mono(Character_LCD):
         else:
             self.backlight_pin.value = self.backlight_inverted
 
-
 class Character_LCD_RGB(Character_LCD):
     """Interfaces with RGB character LCDs.
 
@@ -654,3 +653,64 @@ class Character_LCD_RGB(Character_LCD):
                 # on / off.  Assume a DigitalInOut (or compatible interface) and write
                 # 0 (on) to pin for any value greater than 0, or 1 (off) for 0:
                 pin.value = not color[number] > 1
+
+class Character_LCD_China(Character_LCD):
+    def __init__(self, rs, en, db4, db5, db6, db7, columns, lines,
+                 red, green, blue, read_write=None, backlight_pin=None, backlight_inverted=False):
+
+        # Backlight pin and inversion
+        self.backlight_pin = backlight_pin
+        self.backlight_inverted = backlight_inverted
+
+        #  Setup backlight
+        if backlight_pin is not None:
+            self.backlight_pin.direction = digitalio.Direction.OUTPUT
+            self.backlight = True
+
+        # Define read_write (rw) pin
+        self.read_write = read_write
+
+        # Setup rw pin if used
+        if read_write is not None:
+            self.read_write.direction = digitalio.Direction.OUTPUT
+
+        # define color params
+        self.rgb_led = [red, green, blue]
+
+        for pin in self.rgb_led:
+            if hasattr(pin, 'direction'):
+                # Assume a digitalio.DigitalInOut or compatible interface:
+                pin.direction = digitalio.Direction.OUTPUT
+            elif not hasattr(pin, 'duty_cycle'):
+                raise TypeError(
+                    'RGB LED objects must be instances of digitalio.DigitalInOut'
+                    ' or pulseio.PWMOut, or provide a compatible interface.'
+                )
+
+        self._color = [0, 0, 0]
+        super().__init__(rs, en, db4, db5, db6, db7, columns, lines)
+
+    @property
+    def color(self):
+        return self._color
+
+    @color.setter
+    def color(self, color):
+        self._color = color
+        for number, pin in enumerate(self.rgb_led):
+            if hasattr(pin, 'duty_cycle'):
+                pin.duty_cycle = int(_map(color[number], 0, 100, 65535, 0))
+            elif hasattr(pin, 'value'):
+                pin.value = not color[number] > 1
+
+    @property
+    def backlight(self):
+        return self._enable
+
+    @backlight.setter
+    def backlight(self, enable):
+        self._enable = enable
+        if enable:
+            self.backlight_pin.value = self.backlight_inverted
+        else:
+            self.backlight_pin.value = not self.backlight_inverted
